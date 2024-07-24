@@ -3,9 +3,7 @@
 from __future__ import print_function
 
 import rospy
-
 from std_msgs.msg import Float64
-
 import sys, select, termios, tty
 
 msg = """
@@ -31,28 +29,28 @@ CTRL-C to quit
 """
 
 moveBindings = {
-        'i':(-1,0,1),
-        'o':(-1,1,0),
-        'j':(1,1,1),
-        'l':(-1,-1,-1),
-        'u':(-1,0,1),
-        ',':(1,0,-1),
-        '.':(0,1,-1),
-        'm':(1,-1,0),  
-        'O':(-1,1,0),
-        'I':(-1,0,1),
-        'J':(1,-2,1),
-        'L':(-1,2,-1),
-        'U':(0,-1,1),
-        '<':(1,0,-1),
-        '>':(0,1,-1),
-        'M':(1,-1,0),  
-    }
+    'i': (1, 1, 1, 1),
+    'o': (1, -1, 1, -1),
+    'j': (-1, 1, 1, -1),
+    'l': (1, -1, -1, 1),
+    'u': (1, 1, -1, -1),
+    ',': (-1, -1, -1, -1),
+    '.': (-1, 1, -1, 1),
+    'm': (-1, -1, 1, 1),
+    'O': (1, -1, 1, -1),
+    'I': (1, 1, 1, 1),
+    'J': (-1, 1, 1, -1),
+    'L': (1, -1, -1, 1),
+    'U': (1, 1, -1, -1),
+    '<': (-1, -1, -1, -1),
+    '>': (-1, 1, -1, 1),
+    'M': (-1, -1, 1, 1),
+}
 
-speedBindings={
-        'q':(1.1,1.1),
-        'z':(.9,.9),
-    }
+speedBindings = {
+    'q': (1.1, 1.1),
+    'z': (0.9, 0.9),
+}
 
 def getKey():
     tty.setraw(sys.stdin.fileno())
@@ -60,23 +58,23 @@ def getKey():
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
-
 def vels(speed):
     return "currently:\tspeed %s " % (speed)
 
-if __name__=="__main__":
+if __name__ == "__main__":
     settings = termios.tcgetattr(sys.stdin)
 
     rospy.init_node('vel_Publisher')
     publ = rospy.Publisher('/open_base/left_joint_velocity_controller/command', Float64, queue_size=1)
     pubb = rospy.Publisher('/open_base/back_joint_velocity_controller/command', Float64, queue_size=1)
     pubr = rospy.Publisher('/open_base/right_joint_velocity_controller/command', Float64, queue_size=1)
-
+    pubf = rospy.Publisher('/open_base/front_joint_velocity_controller/command', Float64, queue_size=1)  # New publisher for the fourth wheel
 
     speed = 1.0
     x = 0
     y = 0
     z = 0
+    w = 0
     status = 0
 
     try:
@@ -88,9 +86,9 @@ if __name__=="__main__":
                 x = moveBindings[key][0]
                 y = moveBindings[key][1]
                 z = moveBindings[key][2]
+                w = moveBindings[key][3]  # Velocity for the fourth wheel
             elif key in speedBindings.keys():
                 speed = speed * speedBindings[key][0]
-       
                 print(vels(speed))
                 if (status == 14):
                     print(msg)
@@ -99,36 +97,42 @@ if __name__=="__main__":
                 x = 0
                 y = 0
                 z = 0
-                th = 0
+                w = 0
                 if (key == '\x03'):
                     break
 
             vell = Float64()
-	    velb = Float64()
-	    velr = Float64()
-	
-	    vell = x*speed
-	    velb = y*speed
-	    velr = z*speed
+            velb = Float64()
+            velr = Float64()
+            velf = Float64()
 
-	    publ.publish(vell)
-	    pubb.publish(velb)
-	    pubr.publish(velr)
+            vell.data = x * speed
+            velb.data = y * speed
+            velr.data = z * speed
+            velf.data = w * speed
+
+            publ.publish(vell)
+            pubb.publish(velb)
+            pubr.publish(velr)
+            pubf.publish(velf)
 
     except Exception as e:
         print(e)
 
     finally:
         vell = Float64()
-	velb = Float64()
-	velr = Float64()
-	
-	vell = 0.0
-	velb = 0.0
-	velr = 0.0
+        velb = Float64()
+        velr = Float64()
+        velf = Float64()
 
-	pubb.publish(vell)
-	publ.publish(velb)
-	pubr.publish(velr)
+        vell.data = 0.0
+        velb.data = 0.0
+        velr.data = 0.0
+        velf.data = 0.0
+
+        publ.publish(vell)
+        pubb.publish(velb)
+        pubr.publish(velr)
+        pubf.publish(velf)
 
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
